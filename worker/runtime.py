@@ -11,6 +11,30 @@ from movement_smith.motion.convert import clip_from_hymotion_output
 from movement_smith.motion.schema import DEFAULT_FPS, MotionClip
 
 
+_VARIANT_DIRS = {
+    "lite": "HY-Motion-1.0-Lite",
+    "full": "HY-Motion-1.0",
+}
+
+
+def resolve_model_path(root: Path, variant: str, model_path_env: str | None) -> Path:
+    if variant not in _VARIANT_DIRS:
+        raise ValueError("HYMOTION_VARIANT must be lite or full")
+    default = root / "ckpts" / "tencent" / _VARIANT_DIRS[variant]
+    raw = (model_path_env or "").strip()
+    if not raw:
+        return default
+    model_path = Path(raw).expanduser()
+    implied = next((name for name, dirname in _VARIANT_DIRS.items() if dirname == model_path.name), None)
+    if implied is not None and implied != variant:
+        raise ValueError(
+            f"HYMOTION_VARIANT={variant} but HYMOTION_MODEL_PATH is {model_path} "
+            f"(that directory is the {implied} checkpoint). Unset HYMOTION_MODEL_PATH "
+            f"to use {default}, or point it at the {variant} weights."
+        )
+    return model_path
+
+
 @dataclass
 class WorkerRuntime:
     t2m: object
@@ -48,12 +72,7 @@ def load_runtime() -> WorkerRuntime:
         sys.path.insert(0, root_str)
 
     variant = os.environ.get("HYMOTION_VARIANT", "lite").strip().lower()
-    if variant not in {"lite", "full"}:
-        raise ValueError("HYMOTION_VARIANT must be lite or full")
-    default_rel = (
-        "ckpts/tencent/HY-Motion-1.0-Lite" if variant == "lite" else "ckpts/tencent/HY-Motion-1.0"
-    )
-    model_path = Path(os.environ.get("HYMOTION_MODEL_PATH", str(root / default_rel))).expanduser()
+    model_path = resolve_model_path(root, variant, os.environ.get("HYMOTION_MODEL_PATH"))
     cfg = model_path / "config.yml"
     ckpt = model_path / "latest.ckpt"
     if not cfg.is_file() or not ckpt.is_file():

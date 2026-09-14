@@ -60,11 +60,12 @@ On the GPU host, from this repository, with HY-Motion on `PYTHONPATH` via `HYMOT
 ```
 export HYMOTION_ROOT=/path/to/HY-Motion-1.0
 export HYMOTION_VARIANT=lite
-export HYMOTION_MODEL_PATH=$HYMOTION_ROOT/ckpts/tencent/HY-Motion-1.0-Lite
 export DISABLE_PROMPT_ENGINEERING=True
 export MOVEMENT_SMITH_WORKER_TOKEN=optional-shared-secret
 PYTHONPATH=. .venv/bin/python -m uvicorn worker.app:app --host 0.0.0.0 --port 8100
 ```
+
+`HYMOTION_VARIANT` selects `ckpts/tencent/HY-Motion-1.0-Lite` or `ckpts/tencent/HY-Motion-1.0`. Set `HYMOTION_MODEL_PATH` only to override that directory. The worker rejects a path whose last component is the other variant's checkpoint name.
 
 On the studio machine:
 
@@ -135,8 +136,8 @@ The local app retargets that clip onto the browser skeleton snapshot (bone names
 | `MOVEMENT_SMITH_ALLOW_STUB` | studio | `1` to use synthetic motion when no worker URL is set. |
 | `MOVEMENT_SMITH_DATA_DIR` | studio | Job JSON directory. Default `data/`. |
 | `HYMOTION_ROOT` | worker | Clone of HY-Motion-1.0. |
-| `HYMOTION_MODEL_PATH` | worker | Directory with `config.yml` and `latest.ckpt`. |
-| `HYMOTION_VARIANT` | worker | `lite` or `full`. |
+| `HYMOTION_VARIANT` | worker | `lite` or `full`. Selects the default checkpoint directory under `HYMOTION_ROOT`. |
+| `HYMOTION_MODEL_PATH` | worker | Optional. Directory with `config.yml` and `latest.ckpt`. Defaults from `HYMOTION_VARIANT`. |
 | `DISABLE_PROMPT_ENGINEERING` | worker | Default `True`. |
 | `HF_TOKEN` | Modal secret | Hugging Face access for gated DiT weights (and encoder downloads). |
 | `USE_HF_MODELS` | worker | Set to `1` on Modal so CLIP/Qwen load from Hugging Face IDs. Default in HY-Motion is `0` (local `ckpts/`). |
