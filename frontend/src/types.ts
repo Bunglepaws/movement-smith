@@ -16,6 +16,7 @@ export type BonePair = {
 };
 
 export type MappingResult = {
+  joint_order: string[];
   pairs: BonePair[];
   unmapped_sources: string[];
   extra_targets: string[];

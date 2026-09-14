@@ -8,7 +8,7 @@ _PREFIX_RE = re.compile(
     r"^(?:"
     r"mixamorig:|mixamorig|mixamo:|mixamo|"
     r"j_bip_c_|j_bip_l_|j_bip_r_|j_bip_|"
-    r"cc_base_|def_|bip_|armature\|armature_|"
+    r"cc_base_|def[-_]|bip_|armature\|armature_|"
     r"genesis[0-9]*_|"
     r"character1_|"
     r")"

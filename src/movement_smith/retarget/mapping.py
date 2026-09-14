@@ -214,6 +214,7 @@ class MappingResult:
 
     def as_dict(self) -> dict:
         return {
+            "joint_order": list(SMPLH_JOINT_NAMES),
             "pairs": [
                 {"source": p.source, "target": p.target, "method": p.method} for p in self.pairs
             ],

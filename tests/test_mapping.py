@@ -109,3 +109,32 @@ def test_blender_spine_chain_maps_pelvis_to_bare_spine() -> None:
     assert result.source_to_target["L_Collar"] == "shoulderL"
     assert "root" in result.extra_targets
     assert "pelvisL" in result.extra_targets
+
+
+def test_rigify_def_hyphen_prefix_maps_body() -> None:
+    bones = [
+        "DEF-spine",
+        "DEF-spine001",
+        "DEF-spine002",
+        "DEF-spine003",
+        "DEF-thighL",
+        "DEF-shinL",
+        "DEF-footL",
+        "DEF-toeL",
+        "DEF-thighR",
+        "DEF-shinR",
+        "DEF-footR",
+        "DEF-toeR",
+        "DEF-shoulderL",
+        "DEF-upper_armL",
+        "DEF-forearmL",
+        "DEF-handL",
+        "DEF-shoulderR",
+        "DEF-upper_armR",
+        "DEF-forearmR",
+        "DEF-handR",
+    ]
+    result = map_skeleton(bones)
+    assert result.body_coverage >= 0.9
+    assert result.source_to_target["Pelvis"] == "DEF-spine"
+    assert result.source_to_target["L_Hip"] == "DEF-thighL"

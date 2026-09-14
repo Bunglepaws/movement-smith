@@ -12,6 +12,7 @@ def test_strips_vrm_prefix() -> None:
 
 def test_strips_def_and_separators() -> None:
     assert normalize_bone_name("DEF_upper_arm.L") == "upperarml"
+    assert normalize_bone_name("DEF-thighL") == "thighl"
 
 
 def test_blender_side_suffix() -> None:

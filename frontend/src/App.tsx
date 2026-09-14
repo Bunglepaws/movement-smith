@@ -193,7 +193,9 @@ export default function App() {
   const boneOptions = useMemo(() => snapshot.bones.map((b) => b.name), [snapshot]);
 
   const onOverride = (source: string, target: string) => {
-    const next = { ...override, [source]: target };
+    const next = { ...override };
+    if (target) next[source] = target;
+    else delete next[source];
     setOverride(next);
     void remap(snapshot, next);
   };
@@ -286,20 +288,24 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {(mapping?.pairs ?? []).map((pair) => (
-                  <tr key={pair.source}>
-                    <td>{pair.source}</td>
-                    <td>
-                      <select value={pair.target} onChange={(e) => onOverride(pair.source, e.target.value)}>
-                        {boneOptions.map((name) => (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                  </tr>
-                ))}
+                {(mapping?.joint_order ?? mapping?.pairs.map((p) => p.source) ?? []).map((source) => {
+                  const target = mapping?.source_to_target[source] ?? "";
+                  return (
+                    <tr key={source}>
+                      <td>{source}</td>
+                      <td>
+                        <select value={target} onChange={(e) => onOverride(source, e.target.value)}>
+                          <option value="">—</option>
+                          {boneOptions.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
