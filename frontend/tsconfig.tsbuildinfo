@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/api.ts","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/viewer/StudioCanvas.tsx","./src/viewer/clip.ts","./src/viewer/mannequin.ts","./src/viewer/retarget.ts","./src/viewer/skeleton.ts"],"version":"5.9.3"}

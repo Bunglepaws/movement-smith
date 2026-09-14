@@ -1,0 +1,16 @@
+[project]
+name = "movement-smith-worker"
+version = "0.1.0"
+description = "HY-Motion GPU worker for movement-smith. Run from the repository root; do not pip-install this directory."
+requires-python = ">=3.11"
+dependencies = [
+  "movement-smith",
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.32.0",
+]
+
+[project.optional-dependencies]
+modal = [
+  "modal>=0.73.0",
+  "huggingface_hub>=0.26.0",
+]
