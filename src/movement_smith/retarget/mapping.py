@@ -191,6 +191,21 @@ _CORE_TO_JOINT = {
     "toebase": "Foot",
     "toe": "Foot",
     "ball": "Foot",
+    "findex01": "Index1",
+    "findex02": "Index2",
+    "findex03": "Index3",
+    "fmiddle01": "Middle1",
+    "fmiddle02": "Middle2",
+    "fmiddle03": "Middle3",
+    "fpinky01": "Pinky1",
+    "fpinky02": "Pinky2",
+    "fpinky03": "Pinky3",
+    "fring01": "Ring1",
+    "fring02": "Ring2",
+    "fring03": "Ring3",
+    "thumb01": "Thumb1",
+    "thumb02": "Thumb2",
+    "thumb03": "Thumb3",
 }
 
 
@@ -242,7 +257,8 @@ def map_skeleton(
     pairs: list[BonePair] = []
     assigned: dict[str, str] = {}
     mixamo_spine = _has_mixamo_spine_chain(bone_names)
-    blender_spine = _has_blender_spine_chain(bone_names)
+    hip_blender_spine = _has_hip_blender_spine(bone_names)
+    blender_spine = _has_blender_spine_chain(bone_names) and not hip_blender_spine
 
     for source, target in override.items():
         if source not in SMPLH_JOINT_NAMES:
@@ -255,7 +271,12 @@ def map_skeleton(
 
     remaining_bones = [name for name in bone_names if name not in used_targets]
     for bone in remaining_bones:
-        joint = _lookup_alias(bone, mixamo_spine=mixamo_spine, blender_spine=blender_spine)
+        joint = _lookup_alias(
+            bone,
+            mixamo_spine=mixamo_spine,
+            blender_spine=blender_spine,
+            hip_blender_spine=hip_blender_spine,
+        )
         if joint is None or joint in assigned:
             continue
         pairs.append(BonePair(source=joint, target=bone, method="alias"))
@@ -308,8 +329,32 @@ def _has_blender_spine_chain(bone_names: list[str]) -> bool:
     return "spine" in keys and bool(keys & {"spine001", "spine01"})
 
 
-def _lookup_alias(bone: str, *, mixamo_spine: bool, blender_spine: bool) -> str | None:
+def _has_hip_blender_spine(bone_names: list[str]) -> bool:
+    """hips/pelvis plus spine.001: thighs hang from hips, so spine is not Pelvis."""
+    keys = {normalize_bone_name(name) for name in bone_names}
+    if not keys & {"hips", "hip", "pelvis"}:
+        return False
+    return "spine" in keys and bool(keys & {"spine001", "spine01"})
+
+
+def _lookup_alias(
+    bone: str,
+    *,
+    mixamo_spine: bool,
+    blender_spine: bool,
+    hip_blender_spine: bool,
+) -> str | None:
     key = normalize_bone_name(bone)
+    if hip_blender_spine:
+        shifted = {
+            "spine": "Spine1",
+            "spine001": "Spine2",
+            "spine01": "Spine2",
+            "spine002": "Spine3",
+            "spine02": "Spine3",
+        }
+        if key in shifted:
+            return shifted[key]
     if blender_spine and key in {"spine", "spine001", "spine01", "spine002", "spine02", "spine003", "spine03"}:
         return {
             "spine": "Pelvis",
@@ -377,6 +422,8 @@ def _fuzzy_joint(bone: str, candidates: list[str], min_ratio: float = 0.78) -> s
 def _fuzzy_allowed(bone_key: str, joint: str) -> bool:
     """Block anatomically silly fuzzy matches (spine ↔ pelvis, etc.)."""
     if bone_key.startswith("spine") and joint == "Pelvis":
+        return False
+    if bone_key == "spine" and joint in {"Spine2", "Spine3"}:
         return False
     if bone_key in {"pelvis", "hips", "hip", "root"} and joint.startswith("Spine"):
         return False

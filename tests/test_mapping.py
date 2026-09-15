@@ -138,3 +138,48 @@ def test_rigify_def_hyphen_prefix_maps_body() -> None:
     assert result.body_coverage >= 0.9
     assert result.source_to_target["Pelvis"] == "DEF-spine"
     assert result.source_to_target["L_Hip"] == "DEF-thighL"
+
+
+def test_hip_rooted_blender_spine_does_not_map_spine_to_pelvis() -> None:
+    bones = [
+        "hips",
+        "pelvis.L",
+        "pelvis.R",
+        "spine",
+        "spine.001",
+        "spine.002",
+        "neck",
+        "head",
+        "shoulder.L",
+        "upper_arm.L",
+        "forearm.L",
+        "hand.L",
+        "shoulder.R",
+        "upper_arm.R",
+        "forearm.R",
+        "hand.R",
+        "thigh.L",
+        "shin.L",
+        "foot.L",
+        "toe.L",
+        "thigh.R",
+        "shin.R",
+        "foot.R",
+        "toe.R",
+        "f_index.01.L",
+        "f_index.02.L",
+        "f_index.03.L",
+        "f_index.01.R",
+        "f_index.02.R",
+        "f_index.03.R",
+    ]
+    result = map_skeleton(bones)
+    assert result.source_to_target["Pelvis"] == "hips"
+    assert result.source_to_target["Spine1"] == "spine"
+    assert result.source_to_target["Spine2"] == "spine.001"
+    assert result.source_to_target["Spine3"] == "spine.002"
+    assert result.source_to_target["L_Index1"] == "f_index.01.L"
+    assert result.source_to_target["R_Index3"] == "f_index.03.R"
+    assert "pelvis.L" in result.extra_targets
+    assert result.body_coverage == 1.0
+

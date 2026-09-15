@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Grid, OrbitControls } from "@react-three/drei";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type RefObject } from "react";
 import * as THREE from "three";
 import { fitCamera } from "./skeleton";
 
@@ -9,6 +9,8 @@ type Props = {
   mixer: THREE.AnimationMixer | null;
   playing: boolean;
   showSkeleton: boolean;
+  actionRef: RefObject<THREE.AnimationAction | null>;
+  onTime: (time: number) => void;
 };
 
 function BoneOverlay({ object, visible }: { object: THREE.Object3D; visible: boolean }) {
@@ -17,7 +19,7 @@ function BoneOverlay({ object, visible }: { object: THREE.Object3D; visible: boo
   return <primitive object={helper} />;
 }
 
-function SceneContents({ character, mixer, playing, showSkeleton }: Props) {
+function SceneContents({ character, mixer, playing, showSkeleton, actionRef, onTime }: Props) {
   const { camera } = useThree();
   const fitted = useRef<THREE.Object3D | null>(null);
 
@@ -31,6 +33,7 @@ function SceneContents({ character, mixer, playing, showSkeleton }: Props) {
   useFrame((_, delta) => {
     if (playing && mixer) {
       mixer.update(delta);
+      onTime(actionRef.current?.time ?? 0);
     }
   });
 

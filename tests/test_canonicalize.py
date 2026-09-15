@@ -19,3 +19,6 @@ def test_blender_side_suffix() -> None:
     assert side_and_core("upper_armL") == ("L", "upperarm")
     assert side_and_core("thighR") == ("R", "thigh")
     assert side_and_core("pelvisL") == ("L", "pelvis")
+    assert side_and_core("f_index.01.L") == ("L", "findex01")
+    assert side_and_core("thumb.02.R") == ("R", "thumb02")
+
