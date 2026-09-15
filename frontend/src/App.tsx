@@ -34,8 +34,12 @@ export default function App() {
   const [mixer, setMixer] = useState<THREE.AnimationMixer | null>(null);
   const [hasClip, setHasClip] = useState(false);
   const [clipDuration, setClipDuration] = useState(0);
+  const [armSpread, setArmSpread] = useState(0);
   const [fileLabel, setFileLabel] = useState("Default mannequin");
   const [draggingFile, setDraggingFile] = useState(false);
+  const sourceClipRef = useRef<MotionClip | null>(null);
+  const fallbackClipRef = useRef<RetargetedClip | null>(null);
+  const mappingRef = useRef<MappingResult | null>(null);
 
   const remap = useCallback(
     async (snap: SkeletonSnapshot, ov: Record<string, string>) => {
@@ -59,6 +63,9 @@ export default function App() {
       mixerRef.current = null;
       actionRef.current = null;
       clipRef.current = null;
+      sourceClipRef.current = null;
+      fallbackClipRef.current = null;
+      mappingRef.current = null;
       setMixer(null);
       setHasClip(false);
       setPlaying(false);
@@ -149,11 +156,20 @@ export default function App() {
     }
   };
 
-  const playClip = (source: MotionClip | null, fallback: RetargetedClip | null, map: MappingResult) => {
+  const playClip = (
+    source: MotionClip | null,
+    fallback: RetargetedClip | null,
+    map: MappingResult,
+    spreadDeg = armSpread,
+    resume?: { time: number; playing: boolean },
+  ) => {
+    sourceClipRef.current = source;
+    fallbackClipRef.current = fallback;
+    mappingRef.current = map;
     mixerRef.current?.stopAllAction();
     resetToBindPose(characterRef.current);
     const threeClip = source
-      ? buildPlaybackClip(source, map, characterRef.current, zeroXz)
+      ? buildPlaybackClip(source, map, characterRef.current, zeroXz, spreadDeg)
       : fallback
         ? clipFromRetarget(fallback, characterRef.current)
         : null;
@@ -165,11 +181,28 @@ export default function App() {
     const action = mixer.clipAction(threeClip);
     action.loop = THREE.LoopRepeat;
     action.play();
+    const time = Math.min(resume?.time ?? 0, threeClip.duration);
+    action.time = time;
+    mixer.update(0);
+    if (resume && !resume.playing) {
+      action.paused = true;
+    }
     actionRef.current = action;
     setClipDuration(threeClip.duration);
     setHasClip(true);
-    setPlaying(true);
-    setTime(0);
+    setPlaying(resume ? resume.playing : true);
+    setTime(time);
+  };
+
+  const onArmSpread = (deg: number) => {
+    setArmSpread(deg);
+    const source = sourceClipRef.current;
+    const map = mappingRef.current;
+    if (!source || !map) return;
+    playClip(source, fallbackClipRef.current, map, deg, {
+      time: actionRef.current?.time ?? 0,
+      playing,
+    });
   };
 
   const onScrub = (value: number) => {
@@ -350,6 +383,17 @@ export default function App() {
               step={0.5}
               value={cfg}
               onChange={(e) => setCfg(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Arm spread {armSpread}°
+            <input
+              type="range"
+              min={0}
+              max={90}
+              step={1}
+              value={armSpread}
+              onChange={(e) => onArmSpread(Number(e.target.value))}
             />
           </label>
           <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>

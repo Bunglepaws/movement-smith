@@ -239,6 +239,7 @@ export function retargetDeformRoot(
   mapping: MappingResult,
   root: THREE.Object3D,
   zeroRoot: boolean,
+  armSpreadDeg = 0,
 ): RetargetedClip {
   resetToBindPose(root);
   const bones = indexBones(root);
@@ -314,7 +315,9 @@ export function retargetDeformRoot(
           ? limbLocalFromDirection(smpl, restW, parentRest, charRestDir, smplRestDir)
           : null;
       const local = limbLocal ?? parentRest.clone().invert().multiply(smpl).multiply(restW);
-      rot[target].push(local.w, local.x, local.y, local.z);
+      const spread = armSpreadQuat(joint, armSpreadDeg, limbRestDir.get(target));
+      const posed = spread ? parentRest.clone().invert().multiply(spread).multiply(parentRest).multiply(local) : local;
+      rot[target].push(posed.w, posed.x, posed.y, posed.z);
     }
   }
 
@@ -388,6 +391,7 @@ export function retargetWorldDelta(
   mapping: MappingResult,
   root: THREE.Object3D,
   zeroRoot: boolean,
+  armSpreadDeg = 0,
 ): RetargetedClip {
   resetToBindPose(root);
   const bones = indexBones(root);
@@ -432,6 +436,18 @@ export function retargetWorldDelta(
     if (hip) positions[hipBone] = rootLocalPositions(clip, hip);
   }
 
+  const shoulderRestDir = new Map<string, THREE.Vector3>();
+  for (const joint of ["L_Shoulder", "R_Shoulder"]) {
+    const target = apply[joint];
+    if (!target) continue;
+    const bone = bones.get(target);
+    if (!bone) continue;
+    const childJoint = LIMB_CHILD_JOINT[joint];
+    const childBone = childJoint ? (mapping.source_to_target[childJoint] ?? null) : null;
+    const dir = restBoneDirection(bone, childBone, bones);
+    if (dir) shoulderRestDir.set(target, dir);
+  }
+
   const order = topoBoneNames(bones, parentName);
   for (let f = 0; f < nFrames; f += 1) {
     const animWorld = new Map<string, THREE.Quaternion>();
@@ -461,7 +477,8 @@ export function retargetWorldDelta(
         ? animWorld.get(parent)
         : implicitParentWorld(restWorld.get(target)!, restL);
       if (!parentWorld) continue;
-      const local = parentWorld.clone().invert().multiply(anim);
+      const joint = targetToJoint.get(target) ?? "";
+      const local = applyWorldSpread(anim, parentWorld, joint, armSpreadDeg, shoulderRestDir.get(target));
       rot[target].push(local.w, local.x, local.y, local.z);
     }
   }
@@ -475,15 +492,40 @@ export function retargetWorldDelta(
   };
 }
 
+/** Abduct the upper arm from hanging toward its rest outward side. */
+function armSpreadQuat(joint: string, deg: number, restDir: THREE.Vector3 | undefined): THREE.Quaternion | null {
+  if ((joint !== "L_Shoulder" && joint !== "R_Shoulder") || Math.abs(deg) < 1e-6) return null;
+  const out = restDir ? restDir.clone() : new THREE.Vector3(joint === "L_Shoulder" ? 1 : -1, 0, 0);
+  out.y = 0;
+  if (out.lengthSq() < 1e-6) out.set(joint === "L_Shoulder" ? 1 : -1, 0, 0);
+  out.normalize();
+  const axis = new THREE.Vector3().crossVectors(new THREE.Vector3(0, -1, 0), out);
+  if (axis.lengthSq() < 1e-6) return null;
+  return new THREE.Quaternion().setFromAxisAngle(axis.normalize(), THREE.MathUtils.degToRad(deg));
+}
+
+function applyWorldSpread(
+  anim: THREE.Quaternion,
+  parentWorld: THREE.Quaternion,
+  joint: string,
+  deg: number,
+  restDir: THREE.Vector3 | undefined,
+): THREE.Quaternion {
+  const spread = armSpreadQuat(joint, deg, restDir);
+  if (!spread) return parentWorld.clone().invert().multiply(anim);
+  return parentWorld.clone().invert().multiply(spread).multiply(anim);
+}
+
 /** Mixamo-style hips use world deltas; deform-root spines stay at rest. */
 export function buildPlaybackClip(
   clip: MotionClip,
   mapping: MappingResult,
   root: THREE.Object3D,
   zeroRoot: boolean,
+  armSpreadDeg = 0,
 ): THREE.AnimationClip {
   const data = useWorldDelta(root, mapping)
-    ? retargetWorldDelta(clip, mapping, root, zeroRoot)
-    : retargetDeformRoot(clip, mapping, root, zeroRoot);
+    ? retargetWorldDelta(clip, mapping, root, zeroRoot, armSpreadDeg)
+    : retargetDeformRoot(clip, mapping, root, zeroRoot, armSpreadDeg);
   return clipFromRetarget(data, root);
 }
