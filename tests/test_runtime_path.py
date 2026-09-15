@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from worker.runtime import resolve_model_path
+from worker.runtime import resolve_device_ids, resolve_model_path
 
 
 ROOT = Path("/data/HY-Motion-1.0")
@@ -32,3 +32,37 @@ def test_model_path_that_names_the_other_variant_is_rejected() -> None:
 def test_unknown_variant_is_rejected() -> None:
     with pytest.raises(ValueError, match="lite or full"):
         resolve_model_path(ROOT, "medium", None)
+
+
+def test_device_ids_require_cuda() -> None:
+    with pytest.raises(RuntimeError, match="CUDA is not available"):
+        resolve_device_ids(
+            False,
+            None,
+            executable="/venv/bin/python",
+            torch_version="2.5.1+cpu",
+            torch_cuda=None,
+            cuda_visible_devices=None,
+        )
+
+
+def test_device_ids_default_to_gpu_zero() -> None:
+    assert resolve_device_ids(
+        True,
+        None,
+        executable="/venv/bin/python",
+        torch_version="2.5.1+cu124",
+        torch_cuda="12.4",
+        cuda_visible_devices=None,
+    ) == [0]
+
+
+def test_device_ids_parse_env() -> None:
+    assert resolve_device_ids(
+        True,
+        "0,1",
+        executable="/venv/bin/python",
+        torch_version="2.5.1+cu124",
+        torch_cuda="12.4",
+        cuda_visible_devices="0,1",
+    ) == [0, 1]

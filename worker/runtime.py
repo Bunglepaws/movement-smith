@@ -35,6 +35,36 @@ def resolve_model_path(root: Path, variant: str, model_path_env: str | None) -> 
     return model_path
 
 
+def resolve_device_ids(
+    cuda_available: bool,
+    device_ids_env: str | None,
+    *,
+    executable: str,
+    torch_version: str,
+    torch_cuda: str | None,
+    cuda_visible_devices: str | None,
+) -> list[int]:
+    if not cuda_available:
+        raise RuntimeError(
+            "CUDA is not available in this process, so T2MRuntime loads on CPU and "
+            "bitsandbytes offloads 4-bit Qwen (meta-device warning). "
+            f"python={executable}; torch={torch_version}; torch.version.cuda={torch_cuda!r}; "
+            f"CUDA_VISIBLE_DEVICES={cuda_visible_devices!r}. "
+            "Run the worker with the HY-Motion virtualenv, which has a CUDA build of PyTorch. "
+            "movement-smith/.venv is CPU-only."
+        )
+    raw = (device_ids_env or "").strip()
+    if not raw:
+        return [0]
+    try:
+        ids = [int(part.strip()) for part in raw.split(",") if part.strip() != ""]
+    except ValueError as exc:
+        raise ValueError("HYMOTION_DEVICE_IDS must be a comma-separated list of integers") from exc
+    if not ids:
+        raise ValueError("HYMOTION_DEVICE_IDS must be a comma-separated list of integers")
+    return ids
+
+
 @dataclass
 class WorkerRuntime:
     t2m: object
@@ -96,9 +126,20 @@ def load_runtime() -> WorkerRuntime:
         "true",
         "yes",
     }
+    import torch
+
+    device_ids = resolve_device_ids(
+        torch.cuda.is_available(),
+        os.environ.get("HYMOTION_DEVICE_IDS"),
+        executable=sys.executable,
+        torch_version=torch.__version__,
+        torch_cuda=torch.version.cuda,
+        cuda_visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES"),
+    )
     t2m = T2MRuntime(
         config_path=str(cfg),
         ckpt_name=str(ckpt),
+        device_ids=device_ids,
         disable_prompt_engineering=disable_pe,
     )
     return WorkerRuntime(t2m=t2m, variant=variant)

@@ -2,7 +2,7 @@ import numpy as np
 
 from movement_smith.motion.geometry import identity_quats
 from movement_smith.motion.schema import MotionClip
-from movement_smith.retarget.joints import SMPLH_JOINT_NAMES
+from movement_smith.retarget.joints import SMPLH_JOINT_INDEX, SMPLH_JOINT_NAMES
 from movement_smith.retarget.mapping import map_skeleton
 from movement_smith.retarget.retarget import retarget_clip
 from movement_smith.retarget.snapshot import BoneSnapshot, SkeletonSnapshot
@@ -88,6 +88,8 @@ def test_retarget_writes_tracks_for_mapped_bones_only() -> None:
     out = retarget_clip(clip, snapshot, mapping, zero_root_xz=True)
     tracked = {t.bone for t in out.tracks}
     assert "LeftArmTwist" not in tracked
+    assert "LeftShoulder" not in tracked
+    assert "RightShoulder" not in tracked
     assert "Hips" in tracked
     hips = next(t for t in out.tracks if t.bone == "Hips")
     # In-place skips position tracks so we never write world-ish coords into local .position.
@@ -240,3 +242,31 @@ def test_inplace_freezes_pelvis_to_rest() -> None:
     tracked = {t.bone for t in out.tracks}
     assert tracked <= {"Hips", "Head"}
     assert "LeftArm" not in tracked
+
+
+def test_skipped_collar_does_not_double_apply_spine() -> None:
+    """Clavicles stay at rest local; spine rotation must not hit the arm twice."""
+    names = ["Hips", "Spine", "LeftShoulder", "LeftArm"]
+    snapshot = _snapshot(names)
+    mapping = map_skeleton(names)
+    assert mapping.source_to_target["L_Collar"] == "LeftShoulder"
+    assert mapping.source_to_target["L_Shoulder"] == "LeftArm"
+    n_frames = 4
+    quats = identity_quats(n_frames, len(SMPLH_JOINT_NAMES))
+    quats[:, SMPLH_JOINT_INDEX["Spine1"], 0] = np.cos(np.pi / 4)
+    quats[:, SMPLH_JOINT_INDEX["Spine1"], 2] = np.sin(np.pi / 4)
+    clip = MotionClip.from_numpy(
+        joint_names=list(SMPLH_JOINT_NAMES),
+        root_trans=np.zeros((n_frames, 3)),
+        rotations_quat=quats,
+    )
+    out = retarget_clip(clip, snapshot, mapping, zero_root_xz=True)
+    tracked = {t.bone for t in out.tracks}
+    assert "LeftShoulder" not in tracked
+    arm = next(t for t in out.tracks if t.bone == "LeftArm")
+    ident = np.array([1.0, 0.0, 0.0, 0.0])
+    for q in arm.rotation:
+        got = np.array(q)
+        if np.dot(got, ident) < 0:
+            got = -got
+        assert np.allclose(got, ident, atol=1e-5)

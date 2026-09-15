@@ -62,8 +62,12 @@ export HYMOTION_ROOT=/path/to/HY-Motion-1.0
 export HYMOTION_VARIANT=lite
 export DISABLE_PROMPT_ENGINEERING=True
 export MOVEMENT_SMITH_WORKER_TOKEN=optional-shared-secret
-PYTHONPATH=. .venv/bin/python -m uvicorn worker.app:app --host 0.0.0.0 --port 8100
+. $HYMOTION_ROOT/.venv/bin/activate
+cd /path/to/movement-smith
+PYTHONPATH=. python -m uvicorn worker.app:app --host 0.0.0.0 --port 8100
 ```
+
+The worker process must use the HY-Motion virtualenv, which has a CUDA build of PyTorch. `movement-smith/.venv` is CPU-only. If `torch.cuda.is_available()` is false, T2MRuntime reports `devices=cpu` and bitsandbytes offloads Qwen with a meta-device warning.
 
 `HYMOTION_VARIANT` selects `ckpts/tencent/HY-Motion-1.0-Lite` or `ckpts/tencent/HY-Motion-1.0`. Set `HYMOTION_MODEL_PATH` only to override that directory. The worker rejects a path whose last component is the other variant's checkpoint name.
 
@@ -138,6 +142,7 @@ The local app retargets that clip onto the browser skeleton snapshot (bone names
 | `HYMOTION_ROOT` | worker | Clone of HY-Motion-1.0. |
 | `HYMOTION_VARIANT` | worker | `lite` or `full`. Selects the default checkpoint directory under `HYMOTION_ROOT`. |
 | `HYMOTION_MODEL_PATH` | worker | Optional. Directory with `config.yml` and `latest.ckpt`. Defaults from `HYMOTION_VARIANT`. |
+| `HYMOTION_DEVICE_IDS` | worker | Optional. Comma-separated GPU ids. Default `0`. |
 | `DISABLE_PROMPT_ENGINEERING` | worker | Default `True`. |
 | `HF_TOKEN` | Modal secret | Hugging Face access for gated DiT weights (and encoder downloads). |
 | `USE_HF_MODELS` | worker | Set to `1` on Modal so CLIP/Qwen load from Hugging Face IDs. Default in HY-Motion is `0` (local `ckpts/`). |

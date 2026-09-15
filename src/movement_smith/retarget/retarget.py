@@ -75,13 +75,19 @@ def retarget_clip(
     smpl_world = _fk_smpl(smpl_local)
     n_frames = clip.n_frames
 
+    # Skipped bones (clavicles, etc.) stay at rest local and follow the
+    # animated parent. Freezing them at rest world double-applies spine to the arm.
     anim_world: dict[str, np.ndarray] = {}
-    for name in bones:
+    for name in _topo_names(bones, parents):
         joint = next((j for j, t in source_to_target.items() if t == name), None)
-        if joint is None:
-            anim_world[name] = np.repeat(rest_world[name][None, ...], n_frames, axis=0)
-        else:
+        if joint is not None:
             anim_world[name] = smpl_world[:, SMPLH_JOINT_INDEX[joint]] @ rest_world[name]
+        else:
+            parent = parents.get(name)
+            if parent is not None:
+                anim_world[name] = anim_world[parent] @ rest_local[name]
+            else:
+                anim_world[name] = np.repeat(rest_world[name][None, ...], n_frames, axis=0)
 
     hip_bone = source_to_target.get("Pelvis")
     hip_positions = None
@@ -118,6 +124,25 @@ def retarget_clip(
         tracks=tracks,
         hip_bone=hip_bone,
     )
+
+
+def _topo_names(bones: dict, parents: dict[str, str | None]) -> list[str]:
+    """Parents before children so skipped bones can follow an animated parent."""
+    seen: set[str] = set()
+    order: list[str] = []
+
+    def visit(name: str) -> None:
+        if name in seen:
+            return
+        seen.add(name)
+        parent = parents.get(name)
+        if parent is not None:
+            visit(parent)
+        order.append(name)
+
+    for name in bones:
+        visit(name)
+    return order
 
 
 def _fk_smpl(local_mats: np.ndarray) -> np.ndarray:

@@ -25,6 +25,25 @@ const SPINE_KEEP: Record<string, number> = {
   Spine3: 0.3,
 };
 
+/**
+ * SMPL-H T-pose limb axes (Y-up). Deform-root A-pose binds already hang the
+ * arms; applying L_Shoulder local as a world swing then folds them into the
+ * torso. Arm bones swing from their rest direction to this axis after SMPL local.
+ */
+const SMPL_LIMB_REST_DIR: Record<string, THREE.Vector3> = {
+  L_Shoulder: new THREE.Vector3(1, 0, 0),
+  R_Shoulder: new THREE.Vector3(-1, 0, 0),
+  L_Elbow: new THREE.Vector3(1, 0, 0),
+  R_Elbow: new THREE.Vector3(-1, 0, 0),
+};
+
+const LIMB_CHILD_JOINT: Record<string, string> = {
+  L_Shoulder: "L_Elbow",
+  R_Shoulder: "R_Elbow",
+  L_Elbow: "L_Wrist",
+  R_Elbow: "R_Wrist",
+};
+
 const SMPLH_PARENTS = [
   -1, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 12, 13, 14, 16, 17, 18, 19, 20, 22, 23, 20, 25, 26, 20, 28, 29, 20, 31,
   32, 20, 34, 35, 21, 37, 38, 21, 40, 41, 21, 43, 44, 21, 46, 47, 21, 49, 50,
@@ -56,7 +75,10 @@ export function isMixamoRig(root: THREE.Object3D): boolean {
   return mixamo;
 }
 
-/** Mixamo / hip-rooted humanoids get full SMPL world deltas; deform-root spines do not. */
+/**
+ * Mixamo / hip-rooted humanoids (`hips`, `pelvis`) get full SMPL world deltas.
+ * Deform-root spines (`DEF-spine`) do not. Blender `hips` matches this path.
+ */
 function useWorldDelta(root: THREE.Object3D, mapping: MappingResult): boolean {
   if (isMixamoRig(root)) return true;
   const pelvis = mapping.source_to_target.Pelvis ?? "";
@@ -170,10 +192,47 @@ function tracksFromWxyz(rot: Record<string, number[]>, positions: Record<string,
   });
 }
 
+function restBoneDirection(
+  bone: THREE.Bone,
+  preferredChild: string | null,
+  bones: Map<string, THREE.Bone>,
+): THREE.Vector3 | null {
+  const child = preferredChild ? bones.get(preferredChild) : undefined;
+  if (child) {
+    const dir = child.getWorldPosition(new THREE.Vector3()).sub(bone.getWorldPosition(new THREE.Vector3()));
+    if (dir.lengthSq() > 1e-8) return dir.normalize();
+  }
+  for (const obj of bone.children) {
+    const next = obj as THREE.Bone;
+    if (!next.isBone) continue;
+    const dir = next.getWorldPosition(new THREE.Vector3()).sub(bone.getWorldPosition(new THREE.Vector3()));
+    if (dir.lengthSq() > 1e-8) return dir.normalize();
+  }
+  return new THREE.Vector3(0, 1, 0)
+    .applyQuaternion(new THREE.Quaternion().setFromRotationMatrix(bone.matrixWorld))
+    .normalize();
+}
+
+/** Swing the rest local so the bone points at `smplLocal * smplRestDir` in world. */
+function limbLocalFromDirection(
+  smplLocal: THREE.Quaternion,
+  restWorld: THREE.Quaternion,
+  parentRest: THREE.Quaternion,
+  charRestDir: THREE.Vector3,
+  smplRestDir: THREE.Vector3,
+): THREE.Quaternion | null {
+  const smplDirWorld = smplRestDir.clone().applyQuaternion(smplLocal);
+  if (charRestDir.lengthSq() < 1e-8 || smplDirWorld.lengthSq() < 1e-8) return null;
+  const swing = new THREE.Quaternion().setFromUnitVectors(charRestDir.clone().normalize(), smplDirWorld.normalize());
+  const animWorld = swing.multiply(restWorld.clone());
+  return parentRest.clone().invert().multiply(animWorld);
+}
+
 /**
  * Deform-root rigs cannot take SMPL pelvis. Each mapped bone gets only that
  * joint's parent-local rotation: `inv(R_parent_rest) * R_smpl_local * R_rest`.
  * Using full SMPL world (relative to pelvis) dumped the torso into every limb.
+ * Arm bones use direction matching so A-pose binds do not fold into the chest.
  */
 export function retargetDeformRoot(
   clip: MotionClip,
@@ -200,6 +259,18 @@ export function retargetDeformRoot(
       continue;
     }
     apply[joint] = target;
+  }
+
+  const limbRestDir = new Map<string, THREE.Vector3>();
+  for (const [joint, target] of Object.entries(apply)) {
+    const smplDir = SMPL_LIMB_REST_DIR[joint];
+    if (!smplDir) continue;
+    const bone = bones.get(target);
+    if (!bone) continue;
+    const childJoint = LIMB_CHILD_JOINT[joint];
+    const childBone = childJoint ? (mapping.source_to_target[childJoint] ?? null) : null;
+    const dir = restBoneDirection(bone, childBone, bones);
+    if (dir) limbRestDir.set(target, dir);
   }
 
   const smplLocal = stabilizeLocals(smplLocalQuats(clip));
@@ -236,7 +307,13 @@ export function retargetDeformRoot(
       if (keep !== undefined) {
         smpl = new THREE.Quaternion().slerp(smpl, keep);
       }
-      const local = parentRest.clone().invert().multiply(smpl).multiply(restW);
+      const smplRestDir = SMPL_LIMB_REST_DIR[joint];
+      const charRestDir = limbRestDir.get(target);
+      const limbLocal =
+        smplRestDir && charRestDir
+          ? limbLocalFromDirection(smpl, restW, parentRest, charRestDir, smplRestDir)
+          : null;
+      const local = limbLocal ?? parentRest.clone().invert().multiply(smpl).multiply(restW);
       rot[target].push(local.w, local.x, local.y, local.z);
     }
   }
@@ -274,10 +351,37 @@ function rootLocalPositions(clip: MotionClip, hip: THREE.Bone): number[][] {
   });
 }
 
+/** Same joints the Python retarget leaves at rest. Clavicles fold cartoon arms in. */
+const SKIP_WORLD_DELTA = new Set([
+  "L_Collar",
+  "R_Collar",
+  "L_Wrist",
+  "R_Wrist",
+  "L_Ankle",
+  "R_Ankle",
+  "L_Foot",
+  "R_Foot",
+]);
+
+function topoBoneNames(bones: Map<string, THREE.Bone>, parentName: Map<string, string | null>): string[] {
+  const seen = new Set<string>();
+  const order: string[] = [];
+  const visit = (name: string) => {
+    if (seen.has(name)) return;
+    seen.add(name);
+    const parent = parentName.get(name);
+    if (parent && bones.has(parent)) visit(parent);
+    order.push(name);
+  };
+  for (const name of bones.keys()) visit(name);
+  return order;
+}
+
 /**
  * Apply SMPL world rotations as deltas on the target bind pose:
  * `R_anim_world = R_smpl_world * R_rest_world`. Locals use the live parent world,
  * including a non-bone Armature recovered as `R_world * R_local^{-1}`.
+ * Skipped bones keep rest local and follow the animated parent.
  */
 export function retargetWorldDelta(
   clip: MotionClip,
@@ -301,7 +405,14 @@ export function retargetWorldDelta(
   const apply: Record<string, string> = {};
   const targetToJoint = new Map<string, string>();
   for (const [joint, target] of Object.entries(mapping.source_to_target)) {
-    if (isHandJoint(joint) || !bones.has(target) || jointIndex[joint] === undefined) continue;
+    if (
+      SKIP_WORLD_DELTA.has(joint) ||
+      isHandJoint(joint) ||
+      !bones.has(target) ||
+      jointIndex[joint] === undefined
+    ) {
+      continue;
+    }
     apply[joint] = target;
     targetToJoint.set(target, joint);
   }
@@ -321,15 +432,24 @@ export function retargetWorldDelta(
     if (hip) positions[hipBone] = rootLocalPositions(clip, hip);
   }
 
+  const order = topoBoneNames(bones, parentName);
   for (let f = 0; f < nFrames; f += 1) {
     const animWorld = new Map<string, THREE.Quaternion>();
-    for (const [name, restW] of restWorld) {
+    for (const name of order) {
+      const restW = restWorld.get(name);
+      const restL = restLocal.get(name);
+      if (!restW || !restL) continue;
       const joint = targetToJoint.get(name);
       const j = joint !== undefined ? jointIndex[joint] : undefined;
       if (j !== undefined) {
         animWorld.set(name, smplWorld[f][j].clone().multiply(restW));
       } else {
-        animWorld.set(name, restW.clone());
+        const parent = parentName.get(name);
+        if (parent && animWorld.has(parent)) {
+          animWorld.set(name, animWorld.get(parent)!.clone().multiply(restL));
+        } else {
+          animWorld.set(name, restW.clone());
+        }
       }
     }
     for (const target of Object.values(apply)) {
