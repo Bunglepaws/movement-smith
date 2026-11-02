@@ -82,6 +82,12 @@ textarea {
   flex: 1;
 }
 
+.export-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .topbar button,
 .promptbar button,
 .left button {

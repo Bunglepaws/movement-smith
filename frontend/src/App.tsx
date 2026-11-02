@@ -5,6 +5,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { createJob, fetchHealth, fetchJob, mapSkeleton } from "./api";
 import type { Health, MappingResult, MotionClip, RetargetedClip, SkeletonSnapshot } from "./types";
 import { clipFromRetarget, downloadBuffer, exportAnimatedGlb } from "./viewer/clip";
+import { exportAnimationFbx, exportModelFbx, exportStem } from "./viewer/fbxExport";
 import { DEFAULT_CHARACTER_LABEL, loadDefaultCharacter } from "./viewer/defaultCharacter";
 import { captureBindPose, extractSnapshot, resetToBindPose } from "./viewer/skeleton";
 import { buildPlaybackClip } from "./viewer/retarget";
@@ -219,12 +220,38 @@ export default function App() {
     mixer.update(0);
   };
 
-  const download = async () => {
+  const stem = exportStem(fileLabel);
+
+  const downloadGlb = async () => {
     const root = characterRef.current;
     if (!root) return;
     try {
       const buffer = await exportAnimatedGlb(root, clipRef.current);
-      downloadBuffer(buffer, "movement-smith-animation.glb");
+      downloadBuffer(buffer, `${stem}-animation.glb`, "model/gltf-binary");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const downloadModelFbx = async () => {
+    const root = characterRef.current;
+    if (!root) return;
+    try {
+      const bytes = await exportModelFbx(root);
+      downloadBuffer(bytes, `${stem}.fbx`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const downloadAnimFbx = () => {
+    const root = characterRef.current;
+    const clip = clipRef.current;
+    if (!root || !clip) return;
+    try {
+      const fps = sourceClipRef.current?.fps ?? fallbackClipRef.current?.fps ?? 30;
+      const bytes = exportAnimationFbx(root, clip, fps);
+      downloadBuffer(bytes, `${stem}-animation.fbx`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -270,9 +297,29 @@ export default function App() {
         >
           Reset default
         </button>
-        <button type="button" onClick={() => void download()} disabled={!hasClip}>
-          Download GLB
-        </button>
+        <div className="export-group">
+          <button type="button" onClick={() => void downloadGlb()} disabled={!hasClip} title="Skinned mesh plus generated clip">
+            Download GLB
+          </button>
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => void downloadModelFbx()}
+            disabled={!character}
+            title="Bind-pose mesh and armature"
+          >
+            Model FBX
+          </button>
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => downloadAnimFbx()}
+            disabled={!hasClip}
+            title="Skeleton and animation only"
+          >
+            Anim FBX
+          </button>
+        </div>
       </header>
 
       <div className="workspace">

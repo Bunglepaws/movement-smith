@@ -21,4 +21,7 @@ def test_blender_side_suffix() -> None:
     assert side_and_core("pelvisL") == ("L", "pelvis")
     assert side_and_core("f_index.01.L") == ("L", "findex01")
     assert side_and_core("thumb.02.R") == ("R", "thumb02")
+    assert side_and_core("f_index01L") == ("L", "findex01")
+    assert side_and_core("thumb01R") == ("R", "thumb01")
+    assert side_and_core("f_pinky.03L") == ("L", "fpinky03")
 

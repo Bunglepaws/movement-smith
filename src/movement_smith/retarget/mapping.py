@@ -191,22 +191,35 @@ _CORE_TO_JOINT = {
     "toebase": "Foot",
     "toe": "Foot",
     "ball": "Foot",
-    "findex01": "Index1",
-    "findex02": "Index2",
-    "findex03": "Index3",
-    "fmiddle01": "Middle1",
-    "fmiddle02": "Middle2",
-    "fmiddle03": "Middle3",
-    "fpinky01": "Pinky1",
-    "fpinky02": "Pinky2",
-    "fpinky03": "Pinky3",
-    "fring01": "Ring1",
-    "fring02": "Ring2",
-    "fring03": "Ring3",
-    "thumb01": "Thumb1",
-    "thumb02": "Thumb2",
-    "thumb03": "Thumb3",
 }
+
+# Rigify uses f_index.01.L; exporters often glue that to f_index01L. Mixamo uses LeftHandIndex1.
+_FINGER_STEMS = {
+    "index": "Index",
+    "findex": "Index",
+    "fingerindex": "Index",
+    "handindex": "Index",
+    "middle": "Middle",
+    "fmiddle": "Middle",
+    "fingermiddle": "Middle",
+    "handmiddle": "Middle",
+    "pinky": "Pinky",
+    "fpinky": "Pinky",
+    "fingerpinky": "Pinky",
+    "handpinky": "Pinky",
+    "ring": "Ring",
+    "fring": "Ring",
+    "fingerring": "Ring",
+    "handring": "Ring",
+    "thumb": "Thumb",
+    "fthumb": "Thumb",
+    "fingerthumb": "Thumb",
+    "handthumb": "Thumb",
+}
+for _stem, _joint in _FINGER_STEMS.items():
+    for _i in range(1, 4):
+        _CORE_TO_JOINT[f"{_stem}{_i}"] = f"{_joint}{_i}"
+        _CORE_TO_JOINT[f"{_stem}0{_i}"] = f"{_joint}{_i}"
 
 
 @dataclass

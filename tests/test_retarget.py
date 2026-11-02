@@ -270,3 +270,38 @@ def test_skipped_collar_does_not_double_apply_spine() -> None:
         if np.dot(got, ident) < 0:
             got = -got
         assert np.allclose(got, ident, atol=1e-5)
+
+
+def test_four_finger_hands_are_applied() -> None:
+    names = [
+        "hips",
+        "handL",
+        "handR",
+        "f_index01L",
+        "f_index02L",
+        "thumb01L",
+        "thumb02L",
+        "f_middle01L",
+        "f_pinky01L",
+        "f_index01R",
+        "f_index02R",
+        "thumb01R",
+        "thumb02R",
+        "f_middle01R",
+        "f_pinky01R",
+    ]
+    snapshot = _snapshot(names)
+    mapping = map_skeleton(names)
+    quats = identity_quats(4, len(SMPLH_JOINT_NAMES))
+    clip = MotionClip.from_numpy(
+        joint_names=list(SMPLH_JOINT_NAMES),
+        root_trans=np.zeros((4, 3)),
+        rotations_quat=quats,
+    )
+    out = retarget_clip(clip, snapshot, mapping, zero_root_xz=True)
+    tracked = {t.bone for t in out.tracks}
+    assert "handL" not in tracked
+    assert "handR" not in tracked
+    assert "f_index01L" in tracked
+    assert "thumb02R" in tracked
+    assert "f_pinky01L" in tracked

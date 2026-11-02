@@ -124,7 +124,7 @@ The local app retargets that clip onto the browser skeleton snapshot (bone names
 - Humanoid motion only.
 - Extra non-body bones do not animate.
 - Seamless loop is not a HY-Motion feature.
-- Download is animated GLB. FBX download is not in v1.
+- Download is animated GLB, model FBX (mesh and armature), or animation FBX (skeleton and clip only, after Generate).
 - Stub motion is used only when `MOVEMENT_SMITH_ALLOW_STUB=1` and `MOVEMENT_SMITH_WORKER_URL` is empty.
 - Modal cold start after idle includes weight and model load.
 - Studio `GET /api/health` does not call a Modal worker. It only reports that Modal is configured. The first Generate request wakes the container.

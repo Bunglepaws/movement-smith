@@ -183,3 +183,76 @@ def test_hip_rooted_blender_spine_does_not_map_spine_to_pelvis() -> None:
     assert "pelvis.L" in result.extra_targets
     assert result.body_coverage == 1.0
 
+
+def test_four_finger_glued_rigify_hands_map() -> None:
+    """Exporters turn f_index.01.L into f_index01L; some binds omit the ring."""
+    bones = [
+        "hips",
+        "pelvisL",
+        "pelvisR",
+        "spine",
+        "spine001",
+        "spine002",
+        "neck",
+        "head",
+        "shoulderL",
+        "upper_armL",
+        "forearmL",
+        "handL",
+        "shoulderR",
+        "upper_armR",
+        "forearmR",
+        "handR",
+        "thighL",
+        "shinL",
+        "footL",
+        "toeL",
+        "thighR",
+        "shinR",
+        "footR",
+        "toeR",
+        "palm01L",
+        "f_index01L",
+        "f_index02L",
+        "f_index03L",
+        "thumb01L",
+        "thumb02L",
+        "thumb03L",
+        "palm02L",
+        "f_middle01L",
+        "f_middle02L",
+        "palm04L",
+        "f_pinky01L",
+        "f_pinky02L",
+        "f_pinky03L",
+        "palm01R",
+        "f_index01R",
+        "f_index02R",
+        "f_index03R",
+        "thumb01R",
+        "thumb02R",
+        "thumb03R",
+        "palm02R",
+        "f_middle01R",
+        "f_middle02R",
+        "palm04R",
+        "f_pinky01R",
+        "f_pinky02R",
+        "f_pinky03R",
+    ]
+    result = map_skeleton(bones)
+    assert result.body_coverage == 1.0
+    assert result.hand_coverage > 0.7
+    assert result.source_to_target["L_Wrist"] == "handL"
+    assert result.source_to_target["L_Index1"] == "f_index01L"
+    assert result.source_to_target["L_Index3"] == "f_index03L"
+    assert result.source_to_target["L_Thumb2"] == "thumb02L"
+    assert result.source_to_target["L_Middle1"] == "f_middle01L"
+    assert result.source_to_target["L_Middle2"] == "f_middle02L"
+    assert result.source_to_target["L_Pinky3"] == "f_pinky03L"
+    assert result.source_to_target["R_Index1"] == "f_index01R"
+    assert "L_Ring1" not in result.source_to_target
+    assert "L_Middle3" not in result.source_to_target
+    assert "palm01L" in result.extra_targets
+    assert "palm04R" in result.extra_targets
+

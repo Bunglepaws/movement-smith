@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@comfyorg/fbx-exporter-three": "^1.0.2",
     "@react-three/drei": "^10.0.6",
     "@react-three/fiber": "^9.1.2",
     "react": "^19.1.0",

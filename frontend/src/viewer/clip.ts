@@ -55,8 +55,15 @@ export function exportAnimatedGlb(root: THREE.Object3D, clip: THREE.AnimationCli
   });
 }
 
-export function downloadBuffer(buffer: ArrayBuffer, filename: string): void {
-  const blob = new Blob([new Uint8Array(buffer)], { type: "model/gltf-binary" });
+export function downloadBuffer(
+  buffer: ArrayBuffer | Uint8Array,
+  filename: string,
+  mime = "application/octet-stream",
+): void {
+  const src = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const bytes = new Uint8Array(src.byteLength);
+  bytes.set(src);
+  const blob = new Blob([bytes], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

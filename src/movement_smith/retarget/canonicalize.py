@@ -16,8 +16,8 @@ _PREFIX_RE = re.compile(
     re.IGNORECASE,
 )
 _SEP_RE = re.compile(r"[_\-:\s.]+")
-# Blender often uses upper_armL / thighR with no separator before the side letter.
-_BLENDER_SIDE_RE = re.compile(r"^(.+?)([LR])$")
+# Blender often uses upper_armL / thighR / f_index01L with no separator before the side letter.
+_BLENDER_SIDE_RE = re.compile(r"^(.+)([LRlr])$")
 
 
 def normalize_bone_name(name: str) -> str:
@@ -46,8 +46,9 @@ def side_and_core(name: str) -> tuple[str | None, str]:
         side = "R"
     else:
         match = _BLENDER_SIDE_RE.match(trimmed)
-        if match and match.group(1)[-1:].isalpha():
-            side = match.group(2)
+        # We accept a letter or digit before L/R so f_index01L / thumb01R count as sided.
+        if match and match.group(1)[-1:].isalnum():
+            side = match.group(2).upper()
             trimmed = match.group(1)
     core = normalize_bone_name(trimmed)
     core = re.sub(r"^(left|right|l|r)", "", core)

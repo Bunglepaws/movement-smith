@@ -56,10 +56,10 @@ def retarget_clip(
     armature rotation and crumples the mesh.
     """
     source_to_target = dict(mapping.source_to_target)
-    for joint in SKIP_BY_DEFAULT:
-        source_to_target.pop(joint, None)
     if apply_hands is None:
         apply_hands = _both_hands_present(source_to_target)
+    for joint in SKIP_BY_DEFAULT:
+        source_to_target.pop(joint, None)
     if not apply_hands:
         for joint in HAND_JOINT_NAMES:
             source_to_target.pop(joint, None)
@@ -157,10 +157,16 @@ def _fk_smpl(local_mats: np.ndarray) -> np.ndarray:
 
 
 def _both_hands_present(assigned: dict[str, str]) -> bool:
+    """True when both wrists and a few fingers per hand are mapped.
+
+    We run this on the raw mapping because wrists are later dropped from tracks.
+    Four-finger binds with no ring still pass.
+    """
     left = "L_Wrist" in assigned
     right = "R_Wrist" in assigned
-    finger_hits = sum(1 for j in HAND_JOINT_NAMES if j in assigned)
-    return left and right and finger_hits >= 10
+    left_fingers = sum(1 for j in HAND_JOINT_NAMES if j.startswith("L_") and j in assigned)
+    right_fingers = sum(1 for j in HAND_JOINT_NAMES if j.startswith("R_") and j in assigned)
+    return left and right and left_fingers >= 4 and right_fingers >= 4
 
 
 def _hip_local_positions(trans: np.ndarray, hip_bone) -> np.ndarray:
